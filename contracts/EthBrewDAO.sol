@@ -9,19 +9,65 @@ pragma solidity ^0.8.0;
 contract EthBrewDAO is ERC20, Ownable {
 
     address[] private holders;
+    DivEligibleTokenHolder[] private dividendEligibleTokenHolders;
+
+    struct DivEligibleTokenHolder {
+        address tokenHolderAddress;
+        uint tokenCount;
+    }
+
+    uint private tokenPrice;
+    bool private primaryTokenSaleWindow;
+    uint private maxTokenLimitPerHolder;
+    uint private autoPayDividends;
+    uint private dividendEligibleTokenBalance;
+    uint private divEligibleTokenCount;
+
+    //this is the address that keeps the balance of dividends and operational cashflows into the brew dao. The primary contract address is only used for the initial fund raise for the tokens
+    //This will keep operational account seperate from the fund raising account.
+    address [] private operationalWalletAddress;
 
     /**
         * @dev owner will start off with all tokens.
         * Max token supply 100,000 = shares of the brewery.
         * Tokens will be transferred manually to investors after launch.
     */
-    constructor(uint numTokens) ERC20("Brew DAO", "BREW") payable {
+    constructor(uint numTokens, address _operationalWalletAddress) ERC20("Brew DAO", "BREW") payable {
         ERC20._mint(msg.sender, numTokens);
+        primaryTokenSaleWindow = true;
+        operationalWalletAddress = _operationalWalletAddress;
     }
     /**
         * @dev owner will deposit profits into the contract once per month.
+
     */
-    function deposit() external payable {}
+    function deposit() external payable onlyOwner returns (bool){
+        operationalWalletAddress.call.value(msg.value)();
+        if (autoPayDividends) {
+            payDividends();
+        }
+        return true;
+    }
+
+    function setTokenPrice(uint _tokenPrice) external onlyOwner {
+        tokenPrice = _tokenPrice;
+    }
+
+    function closePrimaryTokenSaleWindow() external onlyOwner {
+        primaryTokenSaleWindow = false;
+    }
+
+    function setMaxTokenLimitPerHolder(uint _maxallowedTokens) external onlyOwner {
+        maxTokenLimitPerHolder = _maxAllowedTokens;
+    }
+
+    function setAutoPayDividends(uint _autoPayDividends) external onlyOwner {
+        autoPayDividends = _autoPayDividends;
+    }
+
+    function setDividendEligibilityTokenBalance(uint _eligibleTokenBalance) external onlyOwner {
+        dividendEligibleTokenBalance = _eligibleTokenBalance;
+    }
 
 
     /**
@@ -31,8 +77,34 @@ contract EthBrewDAO is ERC20, Ownable {
         * Alternative - could use PaymentSplitter from OpenZeppelin?
         * https://docs.openzeppelin.com/contracts/2.x/api/payment#PaymentSplitter
     */
-    function payDividends() external onlyOwner {
+    function payDividends() onlyOwner {
+        require(operationalWalletAddress.balance > 0, "Not enough balance to pay dividends");
+        uint divPerEligibleToken = operationalWalletAddress.balance / divEligibleTokenCount;
+        uint eligibleTokenHolders = dividendEligibleTokenHolders.length;
+        for (int i = 0; i < eligibleTokenHolders; i++) {
+            DivEligibleTokenHolder divPayTokenHolder = eligibleTokenHolders[i];
+            divPayTokenHolder.tokenHolderAddress.call.value(divPayTokenHolder.tokenCount * divPerEligibleToken)();
+        }
+    }
 
+    /**
+    @dev any one other than the owner can buy tokens when the initial sale window is open.
+    */
+    function initialTokenSale() payable tokenSaleWindowOpen external returns (bool){
+        uint valueSent = msg.value;
+        uint numTokensToTrasfer = valueSent / tokenPrice;
+        transfer(msg.sender, numTokensToTrasfer);
+        return true;
+
+    }
+
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        //check if a particular transfer is allowed. Either amount exceeds the number of tokens an address is allowed to hold
+        uint currentBalance = balanceOf(to);
+        if (currentBalance + amount > maxTokenLimitPerHolder) {
+            revert("Purchase limit exceeds allowable token balance per holder");
+        }
 
     }
 
@@ -44,6 +116,12 @@ contract EthBrewDAO is ERC20, Ownable {
     function _afterTokenTransfer(address from, address to, uint256 amount)
     internal virtual override {
         holders.push(to);
+        uint balance = balanceOf(to);
+        if (balance >= dividendEligibleTokenBalance) {
+            dividendEligibleTokenHolders[DivEligibleTokenHolder.tokenHolderAddress] = to;
+            dividendEligibleTokenHolders[DivEligibleTokenHolder.tokenCount] = balance;
+            divEligibleTokenCount += balance;
+        }
     }
 
     /*
@@ -55,6 +133,11 @@ contract EthBrewDAO is ERC20, Ownable {
 
     function tokenHolders() view external returns (address [] memory) {
         return holders;
+    }
+
+    modifier tokenSaleWindowOpen() {
+        require(primaryTokenSaleWindow == true, "Token Sale Window is closed");
+        _;
     }
 
 }
