@@ -22,15 +22,18 @@ contract EthBrewDAO is ERC20, Ownable {
     event BrewDAOMemberAdded(address indexed memberAddress);
     event BrewTokenTransferred(address indexed to, uint amount);
 
+
     /**
         * @dev owner will start off with all tokens.
         * Max token supply 100,000 = shares of the brewery.
         * Tokens will be transferred manually to investors after launch.
     */
-    constructor(uint numTokens, address payable _operationalWalletAddress) ERC20("Brew DAO", "BREW") payable {
+    constructor(uint numTokens, address payable _operationalWalletAddress, uint _initialTokenPrice, uint _maxTokenLimitPerHolder) ERC20("Brew DAO", "BREW") payable {
         ERC20._mint(msg.sender, numTokens);
         primaryTokenSaleWindow = true;
         operationalWalletAddress = _operationalWalletAddress;
+        maxTokenLimitPerHolder = _maxTokenLimitPerHolder;
+        tokenPrice = _initialTokenPrice;
     }
     /**
         * @dev owner will deposit profits into the contract once per month.
@@ -93,9 +96,11 @@ contract EthBrewDAO is ERC20, Ownable {
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal view override {
         //check if a particular transfer is allowed. Either amount exceeds the number of tokens an address is allowed to hold
-        uint currentBalance = balanceOf(to);
-        if (currentBalance + amount > maxTokenLimitPerHolder) {
-            revert("Purchase limit exceeds allowable token balance per holder");
+        if (to != owner()) {
+            uint currentBalance = balanceOf(to);
+            if (currentBalance + amount > maxTokenLimitPerHolder) {
+                revert("Purchase limit exceeds allowable token balance per holder");
+            }
         }
 
     }
@@ -108,8 +113,10 @@ contract EthBrewDAO is ERC20, Ownable {
     function _afterTokenTransfer(address from, address to, uint256 amount)
     internal virtual override {
         holders.push(to);
-        emit BrewDAOMemberAdded(to);
-        emit BrewTokenTransferred(to, amount);
+        if (from != owner()) {
+            emit BrewDAOMemberAdded(to);
+            emit BrewTokenTransferred(to, amount);
+        }
 
     }
 

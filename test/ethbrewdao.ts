@@ -7,6 +7,8 @@ describe("EthBrewToken", function () {
   let account1;
   let brewDAO;
   let numTokens;
+  let maxTokensPerInvestor;
+  let initialTokenPrice ;
   let investor1;
   let investor2;
   let investor3;
@@ -20,12 +22,19 @@ describe("EthBrewToken", function () {
     investor1 = accounts[3];
     investor2 = accounts[4];
     investor3 = accounts[5];
-    numTokens = 10000;
+    initialTokenPrice = ethers.utils.parseEther(".00001");
+    maxTokensPerInvestor = 1000;
+    numTokens = 100000;
     console.log("owner", owner.address);
     console.log("investor", investor1.address);
     console.log("account1", account1.address);
     const EthBrewDAO = await ethers.getContractFactory("EthBrewDAO");
-    brewDAO = await EthBrewDAO.deploy(numTokens, daoOperationalAccount.address);
+    brewDAO = await EthBrewDAO.deploy(
+      numTokens,
+      daoOperationalAccount.address,
+      initialTokenPrice,
+      maxTokensPerInvestor
+    );
     await brewDAO.deployed();
   });
 
