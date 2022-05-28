@@ -72,4 +72,43 @@ describe("EthBrewToken", function () {
             await expect(transaction).to.be.revertedWith("Purchase limit exceeds allowable token balance per holder");
         });
     });
+
+    describe("after token transfer", function () {
+        it("should add address to the list of holders if it received tokens while having no tokens prior", async function () {
+            await brewDAO.connect(owner).transfer(investor1.address, 100);
+            
+            let holders = await brewDAO.tokenHolders();
+
+            expect(holders).to.contain(investor1.address);
+        });
+
+        it("should not add address to the list of holders if it received tokens while already having tokens", async function () {
+            await brewDAO.connect(owner).transfer(investor1.address, 100);
+            await brewDAO.connect(owner).transfer(investor1.address, 100);
+            
+            let holders = await brewDAO.tokenHolders();
+
+            expect(holders.length).to.equal(2);
+        });
+
+        it("should remove address from the list of holders if all tokens were transfered from it", async function () {
+            await brewDAO.connect(owner).transfer(investor1.address, 100);
+            await brewDAO.connect(investor1).transfer(investor2.address, 100);
+            
+            let holders = await brewDAO.tokenHolders();
+
+            expect(holders.length).to.equal(2);
+            expect(holders).to.not.contain(investor1.address);
+        });
+
+        it("should not remove address from the list of holders if only part of the tokens were transfered from it", async function () {
+            await brewDAO.connect(owner).transfer(investor1.address, 100);
+            await brewDAO.connect(investor1).transfer(investor2.address, 50);
+            
+            let holders = await brewDAO.tokenHolders();
+
+            expect(holders.length).to.equal(3);
+            expect(holders).to.contain(investor1.address);
+        });
+    });
 });

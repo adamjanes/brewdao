@@ -7,7 +7,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract EthBrewDAO is ERC20, Ownable {
 
-    address[] private holders;
+    struct MappingUint {
+        bool exists;
+        uint value;
+    }
+    address[] private _holders;
+    // contains addresses indexes in _holders array for optimized lookup
+    mapping(address => MappingUint) private _holderIndexes;
+
     uint private tokenPrice;
     bool private primaryTokenSaleWindow;
     uint private maxTokenLimitPerHolder;
@@ -105,7 +112,18 @@ contract EthBrewDAO is ERC20, Ownable {
     */
     function _afterTokenTransfer(address from, address to, uint256 amount)
     internal virtual override {
-        holders.push(to);
+        if (balanceOf(to) == amount && !_holderIndexes[to].exists) {
+            _holders.push(to);
+            _holderIndexes[to] = MappingUint(true, _holders.length - 1);
+        }
+
+        if (balanceOf(from) == 0 && _holderIndexes[from].exists) {
+            uint index = _holderIndexes[from].value;
+            _holders[index] = _holders[_holders.length - 1];
+            _holders.pop();
+            delete _holderIndexes[from];
+        }
+
         if (from != owner()) {
             emit BrewDAOMemberAdded(to);
             emit BrewTokenTransferred(to, amount);
@@ -119,12 +137,12 @@ contract EthBrewDAO is ERC20, Ownable {
     /*
     * @dev check the number of token holders in this dao any time. Used for unit testing for assertions that after token transfer is called.
     */
-    function numberOfTokenHolders() view external returns (uint){
-        return holders.length;
+    function numberOfTokenHolders() external view returns (uint){
+        return _holders.length;
     }
 
-    function tokenHolders() view external returns (address [] memory) {
-        return holders;
+    function tokenHolders() external view returns (address [] memory) {
+        return _holders;
     }
 
     modifier tokenSaleWindowOpen() {
