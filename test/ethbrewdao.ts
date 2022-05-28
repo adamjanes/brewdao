@@ -1,27 +1,27 @@
-import {expect} from "chai";
-import {ethers} from "hardhat";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { expect } from "chai";
+import { BigNumber, Wallet } from "ethers";
+import { ethers } from "hardhat";
+import { join } from "path";
+import { EthBrewDAO } from "../typechain";
 
 describe("EthBrewToken", function () {
-    let owner;
-    let daoOperationalAccount;
-    let account1;
-    let brewDAO;
-    let numTokens;
-    let maxTokensPerInvestor;
-    let initialTokenPrice;
-    let investor1;
-    let investor2;
-    let investor3;
+    let owner: SignerWithAddress;
+    let account1: SignerWithAddress;
+    let investor1: SignerWithAddress;
+    let investor2: SignerWithAddress;
+    let investor3: SignerWithAddress;
+    let daoOperationalAccount: Wallet;
+
+    let brewDAO: EthBrewDAO;
+    let numTokens: number;
+    let maxTokensPerInvestor: number;
+    let initialTokenPrice: BigNumber;
 
     beforeEach("deploy contract", async () => {
-        const accounts = await ethers.getSigners();
+        [owner, account1, investor1, investor2, investor3] = await ethers.getSigners();
+        daoOperationalAccount = await ethers.Wallet.createRandom();
 
-        owner = accounts[0];
-        daoOperationalAccount = accounts[1];
-        account1 = accounts[2];
-        investor1 = accounts[3];
-        investor2 = accounts[4];
-        investor3 = accounts[5];
         initialTokenPrice = ethers.utils.parseEther(".0001");
         maxTokensPerInvestor = 1000;
         numTokens = 100000;
@@ -38,42 +38,38 @@ describe("EthBrewToken", function () {
     describe("DAO instantiated with tokens in owner acccount", function () {
         it("owner address should have all the tokens initially", async function () {
             const ownerBalance = await brewDAO.balanceOf(owner.address);
-            expect(ownerBalance.toNumber() === numTokens);
+            expect(ownerBalance.toNumber()).to.equal(numTokens);
         });
     });
 
     describe("transfer tokens", function () {
-        it("should transfer specified  tokens  to the other account and affirm the balance", async function () {
+        it("should transfer specified tokens to the other account and affirm the balance", async function () {
             await brewDAO.connect(owner).transfer(investor1.address, 100);
             const tokenHolderCount = await brewDAO.numberOfTokenHolders();
             const investorTokenCount = await brewDAO.balanceOf(investor1.address);
-            const ownerTokenCount = await brewDAO.balanceOf(owner.address);
             const tokenHolderArray = await brewDAO.tokenHolders();
-            expect(tokenHolderCount.toNumber() === 100);
-            expect(investorTokenCount === 1000);
+
+            expect(tokenHolderCount).to.equal(2);
+            expect(investorTokenCount).to.equal(100);
+            expect(tokenHolderArray.length).to.equal(2);
         });
     });
 
     describe("initial token sale", function () {
         it("should allow buy tokens to an investor after the deployment and add the investor to the list of dao owners.", async function () {
-            await brewDAO.connect(owner);
-            const initialTokenHolderCount = await brewDAO.numberOfTokenHolders();
-            const ownerBalanceOfTokens = await brewDAO.balanceOf(owner.address);
-            const tokenInitialSaleWindow = await brewDAO.isPrimarySaleWindowOpen();
-            expect(ownerBalanceOfTokens.toNumber() === numTokens);
-            expect(initialTokenHolderCount.toNumber() === 1);
-            // investor1 buys tokens on the initial sale offering
-            const saleToInvestor = await brewDAO.connect(investor1).buyOnInitialOffering({
-                from: investor1.address,
-                value: 1
-            })
-            expect(saleToInvestor === true);
-            let investorTokenCount = (await brewDAO.balanceOf(investor1.address)).toNumber();
-            let tokenHolderCount=await brewDAO.numberOfTokenHolders();
-            console.log("await brewDAO.balanceOf(investor1.address)",investorTokenCount);
-            expect(investorTokenCount === 1000);
-            expect(tokenHolderCount === 2);
+            await brewDAO.connect(investor1).buyOnInitialOffering({ value: ethers.utils.parseEther("0.1") });
 
+            let investorTokenCount = await brewDAO.balanceOf(investor1.address);
+            let tokenHolderCount = await brewDAO.numberOfTokenHolders();
+
+            expect(investorTokenCount.toNumber()).to.equal(1000);
+            expect(tokenHolderCount.toNumber()).to.equal(2);
+        });
+
+        it("should not allow to buy tokens over allowed limit.", async function () {
+            let transaction = brewDAO.connect(investor1).buyOnInitialOffering({ value: ethers.utils.parseEther("3") });
+
+            await expect(transaction).to.be.revertedWith("Purchase limit exceeds allowable token balance per holder");
         });
     });
 });

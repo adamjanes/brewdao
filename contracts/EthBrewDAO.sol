@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-pragma solidity ^0.8.0;
 
 contract EthBrewDAO is ERC20, Ownable {
 
@@ -22,7 +21,6 @@ contract EthBrewDAO is ERC20, Ownable {
     event BrewDAOMemberAdded(address indexed memberAddress);
     event BrewTokenTransferred(address indexed to, uint amount);
 
-
     /**
         * @dev owner will start off with all tokens.
         * Max token supply 100,000 = shares of the brewery.
@@ -35,9 +33,9 @@ contract EthBrewDAO is ERC20, Ownable {
         maxTokenLimitPerHolder = _maxTokenLimitPerHolder;
         tokenPrice = _initialTokenPrice;
     }
+
     /**
         * @dev owner will deposit profits into the contract once per month.
-
     */
     function deposit(uint divEligibleTokenCount, address  [] calldata dividendEligibleTokenHolders) external payable onlyOwner returns (bool){
         (bool success,) = operationalWalletAddress.call{value : msg.value}("");
@@ -85,16 +83,13 @@ contract EthBrewDAO is ERC20, Ownable {
     /**
     @dev any one other than the owner can buy tokens when the initial sale window is open.
     */
-    function buyOnInitialOffering() payable tokenSaleWindowOpen external returns (bool){
-        uint valueSent = msg.value;
-        uint numTokensToTransfer = valueSent / tokenPrice;
-        transfer(msg.sender, numTokensToTransfer);
+    function buyOnInitialOffering() external payable tokenSaleWindowOpen returns (bool) {
+        uint numTokensToTransfer = msg.value / tokenPrice;
+        _transfer(owner(), msg.sender, numTokensToTransfer);
         return true;
-
     }
 
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal view override {
+    function _beforeTokenTransfer(address, address to, uint256 amount) internal view override {
         //check if a particular transfer is allowed. Either amount exceeds the number of tokens an address is allowed to hold
         if (to != owner()) {
             uint currentBalance = balanceOf(to);
@@ -102,9 +97,7 @@ contract EthBrewDAO is ERC20, Ownable {
                 revert("Purchase limit exceeds allowable token balance per holder");
             }
         }
-
     }
-
 
     /**
     * @dev after token transfer => update list/mapping of addresses with
@@ -117,7 +110,6 @@ contract EthBrewDAO is ERC20, Ownable {
             emit BrewDAOMemberAdded(to);
             emit BrewTokenTransferred(to, amount);
         }
-
     }
 
     function isPrimarySaleWindowOpen() external view returns (bool){
