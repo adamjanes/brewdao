@@ -85,10 +85,10 @@ contract EthBrewDAO is ERC20, Ownable {
     /**
     @dev any one other than the owner can buy tokens when the initial sale window is open.
     */
-    function initialTokenSale() payable tokenSaleWindowOpen external returns (bool){
+    function buyOnInitialOffering() payable tokenSaleWindowOpen external returns (bool){
         uint valueSent = msg.value;
-        uint numTokensToTrasfer = valueSent / tokenPrice;
-        transfer(msg.sender, numTokensToTrasfer);
+        uint numTokensToTransfer = valueSent / tokenPrice;
+        transfer(msg.sender, numTokensToTransfer);
         return true;
 
     }
@@ -118,6 +118,10 @@ contract EthBrewDAO is ERC20, Ownable {
             emit BrewTokenTransferred(to, amount);
         }
 
+    }
+
+    function isPrimarySaleWindowOpen() external view returns (bool){
+        return primaryTokenSaleWindow;
     }
 
     /*
