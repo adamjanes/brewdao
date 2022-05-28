@@ -15,7 +15,7 @@ contract EthBrewDAO is ERC20, Ownable {
     // contains addresses indexes in _holders array for optimized lookup
     mapping(address => MappingUint) private _holderIndexes;
 
-    uint private tokenPrice;
+    uint public tokenPrice;
     bool private primaryTokenSaleWindow;
     uint private maxTokenLimitPerHolder;
     bool private autoPayDividends;
