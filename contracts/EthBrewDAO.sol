@@ -9,23 +9,18 @@ pragma solidity ^0.8.0;
 contract EthBrewDAO is ERC20, Ownable {
 
     address[] private holders;
-    DivEligibleTokenHolder[] private dividendEligibleTokenHolders;
-
-    struct DivEligibleTokenHolder {
-        address tokenHolderAddress;
-        uint tokenCount;
-    }
-
     uint private tokenPrice;
     bool private primaryTokenSaleWindow;
     uint private maxTokenLimitPerHolder;
     bool private autoPayDividends;
-    uint private dividendEligibleTokenBalance;
-    uint private divEligibleTokenCount;
+    uint private minAmountRequiredToPayDividend;
 
     //this is the address that keeps the balance of dividends and operational cashflows into the brew dao. The primary contract address is only used for the initial fund raise for the tokens
     //This will keep operational account seperate from the fund raising account.
     address payable private operationalWalletAddress;
+
+    event BrewDAOMemberAdded(address indexed memberAddress);
+    event BrewTokenTransferred(address indexed to, uint amount);
 
     /**
         * @dev owner will start off with all tokens.
@@ -41,10 +36,10 @@ contract EthBrewDAO is ERC20, Ownable {
         * @dev owner will deposit profits into the contract once per month.
 
     */
-    function deposit() external payable onlyOwner returns (bool){
-        bool success = operationalWalletAddress.call{value : msg.value}("");
+    function deposit(uint divEligibleTokenCount, address  [] calldata dividendEligibleTokenHolders) external payable onlyOwner returns (bool){
+        (bool success,) = operationalWalletAddress.call{value : msg.value}("");
         if (autoPayDividends == true) {
-            payDividends();
+            payDividends(divEligibleTokenCount, dividendEligibleTokenHolders);
         }
         return success;
     }
@@ -65,10 +60,6 @@ contract EthBrewDAO is ERC20, Ownable {
         autoPayDividends = _autoPayDividends;
     }
 
-    function setDividendEligibilityTokenBalance(uint _eligibleTokenBalance) external onlyOwner {
-        dividendEligibleTokenBalance = _eligibleTokenBalance;
-    }
-
 
     /**
         * @dev owner can trigger a withdrawal to all contract addresses.
@@ -77,13 +68,11 @@ contract EthBrewDAO is ERC20, Ownable {
         * Alternative - could use PaymentSplitter from OpenZeppelin?
         * https://docs.openzeppelin.com/contracts/2.x/api/payment#PaymentSplitter
     */
-    function payDividends() onlyOwner public {
-        require(operationalWalletAddress.balance > 0, "Not enough balance to pay dividends");
-        uint divPerEligibleToken = operationalWalletAddress.balance / divEligibleTokenCount;
+    function payDividends(uint _divEligibleTokenCount, address  [] calldata dividendEligibleTokenHolders) onlyOwner canPayDividend public {
+        uint divPerEligibleToken = operationalWalletAddress.balance / _divEligibleTokenCount;
         uint eligibleTokenHoldersLength = dividendEligibleTokenHolders.length;
         for (uint i = 0; i < eligibleTokenHoldersLength; i++) {
-            DivEligibleTokenHolder memory divPayTokenHolder = dividendEligibleTokenHolders[i];
-            bool success = divPayTokenHolder.tokenHolderAddress.call{value : divPayTokenHolder.tokenCount * divPerEligibleToken}("");
+            (bool success,) = dividendEligibleTokenHolders[i].call{value : balanceOf(dividendEligibleTokenHolders[i]) * divPerEligibleToken}("");
             if (success == false) {
                 revert("Error during dividend payouts");
             }
@@ -102,7 +91,7 @@ contract EthBrewDAO is ERC20, Ownable {
     }
 
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal view override {
         //check if a particular transfer is allowed. Either amount exceeds the number of tokens an address is allowed to hold
         uint currentBalance = balanceOf(to);
         if (currentBalance + amount > maxTokenLimitPerHolder) {
@@ -119,12 +108,9 @@ contract EthBrewDAO is ERC20, Ownable {
     function _afterTokenTransfer(address from, address to, uint256 amount)
     internal virtual override {
         holders.push(to);
-        uint balance = balanceOf(to);
-        if (balance >= dividendEligibleTokenBalance) {
-            dividendEligibleTokenHolders[DivEligibleTokenHolder.tokenHolderAddress] = to;
-            dividendEligibleTokenHolders[DivEligibleTokenHolder.tokenCount] = balance;
-            divEligibleTokenCount += balance;
-        }
+        emit BrewDAOMemberAdded(to);
+        emit BrewTokenTransferred(to, amount);
+
     }
 
     /*
@@ -140,6 +126,11 @@ contract EthBrewDAO is ERC20, Ownable {
 
     modifier tokenSaleWindowOpen() {
         require(primaryTokenSaleWindow == true, "Token Sale Window is closed");
+        _;
+    }
+
+    modifier canPayDividend(){
+        require(operationalWalletAddress.balance >= minAmountRequiredToPayDividend, "Not enough balance to pay dividends");
         _;
     }
 

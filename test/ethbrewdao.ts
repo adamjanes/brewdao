@@ -3,23 +3,29 @@ import { ethers } from "hardhat";
 
 describe("EthBrewToken", function () {
   let owner;
+  let daoOperationalAccount;
   let account1;
   let brewDAO;
   let numTokens;
-  let investor;
+  let investor1;
+  let investor2;
+  let investor3;
 
   beforeEach("deploy contract", async () => {
     const accounts = await ethers.getSigners();
 
     owner = accounts[0];
-    account1 = accounts[1];
-    investor = accounts[2];
+    daoOperationalAccount = accounts[1];
+    account1 = accounts[2];
+    investor1 = accounts[3];
+    investor2 = accounts[4];
+    investor3 = accounts[5];
     numTokens = 10000;
     console.log("owner", owner.address);
-    console.log("investor", investor.address);
+    console.log("investor", investor1.address);
     console.log("account1", account1.address);
     const EthBrewDAO = await ethers.getContractFactory("EthBrewDAO");
-    brewDAO = await EthBrewDAO.deploy(numTokens);
+    brewDAO = await EthBrewDAO.deploy(numTokens, daoOperationalAccount.address);
     await brewDAO.deployed();
   });
 
@@ -31,7 +37,6 @@ describe("EthBrewToken", function () {
     });
   });
 
-  // TODO: doesn't work - can an ERC-20 contract be payable?
   describe("deposit", function () {
     it("should increment contract ETH balance in the eth brew dao token", async function () {
       await brewDAO
@@ -43,9 +48,9 @@ describe("EthBrewToken", function () {
 
   describe("transfer tokens", function () {
     it("should transfer specified  tokens  to the other account and affirm the balance", async function () {
-      await brewDAO.connect(owner).transfer(investor.address, 100);
+      await brewDAO.connect(owner).transfer(investor1.address, 100);
       const tokenHolderCount = await brewDAO.numberOfTokenHolders();
-      const investorTokenCount = await brewDAO.balanceOf(investor.address);
+      const investorTokenCount = await brewDAO.balanceOf(investor1.address);
       const ownerTokenCount = await brewDAO.balanceOf(owner.address);
       console.log(
         "brewDAO.numberOfTokenHolders() ",
