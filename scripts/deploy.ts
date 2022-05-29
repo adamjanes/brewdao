@@ -15,8 +15,7 @@ async function main() {
 
   // We get the contract to deploy
   const BrewDAO = await ethers.getContractFactory("EthBrewDAO");
-  const operationalWallet = await ethers.Wallet.createRandom();
-  const brewDAO = await BrewDAO.deploy(100000, operationalWallet.address, ethers.utils.parseEther(".0001"), 1000);
+  const brewDAO = await BrewDAO.deploy(100000, ethers.utils.parseEther(".0001"), 1000);
 
   await brewDAO.deployed();
 
